@@ -1,13 +1,14 @@
 /* ============================================================================
-   StockFlow — Firebase Bootstrap (Auth + Firestore)
+   StockFlow — Firebase Bootstrap (Auth + Realtime Database)
    ============================================================================
    This module:
      - Initializes Firebase only if js/firebase-config.js has been filled in.
      - Exposes a small, safe API on window.StockFlowFirebase that the rest
        of the app (js/app.js) uses. If Firebase isn't configured, every
        method degrades gracefully so the app keeps working in demo mode.
-     - Provides generic Firestore helpers (loadCollection / syncCollection)
-       used to back the Inventory and Warehouses modules with real data.
+     - Provides generic Realtime Database helpers (loadCollection /
+       syncCollection) used to back the Inventory and Warehouses modules
+       with real, persistent data.
    ============================================================================ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -18,12 +19,11 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore,
-  collection,
-  getDocs,
-  doc,
-  writeBatch
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  getDatabase,
+  ref,
+  get,
+  set
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 
 const cfg = window.STOCKFLOW_FIREBASE_CONFIG || {};
 const isConfigured = Object.values(cfg).every(v => v && !String(v).includes("REPLACE_ME"));
@@ -34,12 +34,12 @@ if (isConfigured) {
   try {
     app = initializeApp(cfg);
     auth = getAuth(app);
-    db = getFirestore(app);
+    db = getDatabase(app);
   } catch (err) {
     console.error("[StockFlow] Firebase failed to initialize:", err);
   }
 } else {
-  console.info("[StockFlow] Firebase config not set — running in demo mode (local sample data only).");
+  console.info("[StockFlow] Firebase config not set, running in demo mode (local sample data only).");
 }
 
 /** Sign in with email + password. Rejects if Firebase isn't configured. */
@@ -58,23 +58,31 @@ function onAuthChange(cb) {
   return onAuthStateChanged(auth, cb);
 }
 
-/** Load every document from a Firestore collection as a plain array. */
+/** Turn a Firestore-style safe key into a Realtime Database safe key
+    (RTDB keys can't contain . # $ [ ] /) */
+function safeKey(raw) {
+  return String(raw).replace(/[.#$\[\]\/\s]/g, "_");
+}
+
+/** Load a whole collection (stored as an object keyed by id) as a plain array. */
 async function loadCollection(name) {
   if (!db) return null; // null = "not available", caller should keep demo data
   try {
-    const snap = await getDocs(collection(db, name));
-    if (snap.empty) return null;
-    return snap.docs.map(d => d.data());
+    const snap = await get(ref(db, name));
+    if (!snap.exists()) return null;
+    const val = snap.val();
+    const arr = Object.values(val);
+    return arr.length ? arr : null;
   } catch (err) {
-    console.error(`[StockFlow] Failed to load Firestore collection "${name}":`, err);
+    console.error(`[StockFlow] Failed to load Realtime Database node "${name}":`, err);
     return null;
   }
 }
 
 /**
- * Overwrite a Firestore collection with the current contents of `items`.
- * Each item must have a stable unique field (id/sku/name) used as its doc ID.
- * Debounced per collection so rapid edits don't spam writes.
+ * Overwrite a Realtime Database node with the current contents of `items`.
+ * Each item is stored keyed by a safe version of its unique field
+ * (id/sku/name). Debounced per collection so rapid edits don't spam writes.
  */
 const _timers = {};
 function syncCollection(name, items, idField) {
@@ -82,16 +90,14 @@ function syncCollection(name, items, idField) {
   clearTimeout(_timers[name]);
   _timers[name] = setTimeout(async () => {
     try {
-      const batch = writeBatch(db);
-      const existing = await getDocs(collection(db, name));
-      existing.forEach(d => batch.delete(d.ref));
+      const obj = {};
       items.forEach((item, i) => {
-        const id = String(item[idField] ?? i).replace(/[\/\s]/g, "_");
-        batch.set(doc(db, name, id), item);
+        const id = safeKey(item[idField] ?? i);
+        obj[id] = item;
       });
-      await batch.commit();
+      await set(ref(db, name), obj);
     } catch (err) {
-      console.error(`[StockFlow] Failed to sync Firestore collection "${name}":`, err);
+      console.error(`[StockFlow] Failed to sync Realtime Database node "${name}":`, err);
     }
   }, 500);
 }
