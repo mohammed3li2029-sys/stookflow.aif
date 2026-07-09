@@ -98,3 +98,15 @@ stockflow-project/
 3. بعدها يمكنك ربط المستودع مباشرة بـ Cloudflare Pages (Cloudflare → Pages → Create → **Connect to Git**) بدلًا من الرفع اليدوي، وسينشر تلقائيًا مع كل Commit جديد.
 
 **ملاحظة:** ملف `js/firebase-config.js` غير محمي بـ `.gitignore` عمدًا — قيم إعداد الويب في Firebase (`apiKey`, `authDomain`, إلخ) ليست سرية بطبيعتها ويمكن رؤيتها من أي متصفح على أي حال؛ الحماية الحقيقية تأتي من `database.rules.json`.
+
+## 7) نشر قواعد Realtime Database عبر Firebase CLI (بديل عن النسخ اليدوي)
+
+المشروع يحتوي الآن على `firebase.json` و`.firebaserc` جاهزين (مرتبطين بمشروعك `stook-flow`). إذا كان عندك Node.js مثبّت:
+
+```bash
+npm install -g firebase-tools
+firebase login
+firebase deploy --only database
+```
+
+هذا يقرأ محتوى `database.rules.json` وينشره تلقائيًا في مشروعك — نفس نتيجة النسخ واللصق اليدوي في لوحة التحكم، لكن أسرع في التحديثات المستقبلية.
