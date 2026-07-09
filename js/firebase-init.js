@@ -15,6 +15,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/fireba
 import {
   getAuth,
   signInWithEmailAndPassword,
+  signInAnonymously,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
@@ -29,12 +30,30 @@ const cfg = window.STOCKFLOW_FIREBASE_CONFIG || {};
 const isConfigured = Object.values(cfg).every(v => v && !String(v).includes("REPLACE_ME"));
 
 let app = null, auth = null, db = null;
+let authReady = Promise.resolve(null);
 
 if (isConfigured) {
   try {
     app = initializeApp(cfg);
     auth = getAuth(app);
     db = getDatabase(app);
+
+    authReady = new Promise(resolve => {
+      const unsubscribe = onAuthStateChanged(auth, user => {
+        if (user) {
+          unsubscribe();
+          resolve(user);
+          return;
+        }
+        signInAnonymously(auth).catch(err => {
+          console.warn('[StockFlow] Firebase anonymous sign-in failed:', err);
+          resolve(null);
+        });
+      }, err => {
+        console.warn('[StockFlow] Firebase auth listener failed:', err);
+        resolve(null);
+      });
+    });
   } catch (err) {
     console.error("[StockFlow] Firebase failed to initialize:", err);
   }
@@ -67,6 +86,7 @@ function safeKey(raw) {
 /** Load a whole collection (stored as an object keyed by id) as a plain array. */
 async function loadCollection(name) {
   if (!db) return null; // null = "not available", caller should keep demo data
+  await authReady;
   try {
     const snap = await get(ref(db, name));
     if (!snap.exists()) return null;
@@ -90,6 +110,8 @@ function syncCollection(name, items, idField) {
   clearTimeout(_timers[name]);
   _timers[name] = setTimeout(async () => {
     try {
+      await authReady;
+      if (!db) return;
       const obj = {};
       items.forEach((item, i) => {
         const id = safeKey(item[idField] ?? i);
@@ -112,4 +134,6 @@ window.StockFlowFirebase = {
 };
 
 // Let the rest of the app know Firebase is ready to use (or confirmed demo-only).
-window.dispatchEvent(new CustomEvent("stockflow-firebase-ready", { detail: { enabled: isConfigured } }));
+Promise.resolve(authReady).then(() => {
+  window.dispatchEvent(new CustomEvent("stockflow-firebase-ready", { detail: { enabled: isConfigured } }));
+});

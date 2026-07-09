@@ -1,33 +1,25 @@
 /* ============================================================================
-   StockFlow — Firebase Configuration (Realtime Database)
+   StockFlow — Firebase Configuration (Auth + Realtime Database)
    ============================================================================
-   HOW TO ACTIVATE FIREBASE (Auth + Realtime Database):
+   This file is filled in with your real Firebase project (stook-flow).
 
-   1. Go to https://console.firebase.google.com -> your project
-      (databaseURL below is already set to yours).
-   2. In Project Settings -> General -> "Your apps", add a Web App and copy
-      the config object Firebase gives you.
-   3. Paste apiKey / authDomain / projectId / appId below, replacing every
-      "REPLACE_ME" value. Leave databaseURL as is (already filled in).
-   4. In the Firebase Console, enable:
-        - Authentication -> Sign-in method -> Email/Password
-        - Realtime Database -> make sure it exists (it does, you shared
-          its URL) and deploy database.rules.json (see README.md).
-   5. Create at least one user under Authentication -> Users, or let users
-      self-register if you wire up a sign-up flow.
-
-   Until apiKey/authDomain/projectId/appId are filled in, StockFlow
-   automatically runs in DEMO MODE: built-in sample data + demo login
-   (username: admin / password: 123456), no Firebase project required.
-   This is what makes the site work immediately after deployment with
-   zero configuration, while staying upgradable to a real backend
-   whenever you're ready.
+   Still required before it goes live:
+   1. Firebase Console -> Authentication -> Sign-in method -> enable
+      Email/Password.
+   2. Firebase Console -> Authentication -> Users -> add at least one user
+      (email + password) - StockFlow only talks to Firebase when you log in
+      with an EMAIL address. The demo account (admin / 123456) stays local
+      on purpose and never touches Firebase.
+   3. Deploy database.rules.json (included in this project) via:
+        firebase deploy --only database
+      or by pasting its contents into Firebase Console -> Realtime Database
+      -> Rules.
    ============================================================================ */
 
 window.STOCKFLOW_FIREBASE_CONFIG = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
+  apiKey: "AIzaSyCGsNliyDdbpZGCLwaHENqTfsq4OtLsWmI",
+  authDomain: "stook-flow.firebaseapp.com",
   databaseURL: "https://stook-flow-default-rtdb.firebaseio.com",
-  appId: "REPLACE_ME"
+  projectId: "stook-flow",
+  appId: "1:850696711319:web:74e3221ae4a04dd9530dd2"
 };
